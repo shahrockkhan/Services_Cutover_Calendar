@@ -1,47 +1,57 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Services Cutover Calendar</title>
-    <script>
-        // Functionality for Ctrl+Click multi-date selection with range drag support
-        function setupDateSelection() {
-            // Implementation goes here
-        }
-
-        // Function to validate form fields
-        function validateForm() {
-            const email = document.getElementById('email').value;
-            const firstName = document.getElementById('first_name').value;
-            const lastName = document.getElementById('last_name').value;
-            if (!email || !firstName || !lastName) {
-                alert('Mandatory fields cannot be empty!');
-                return false;
-            }
-            return true;
-        }
-
-        // Function to get booking timestamp in EST timezone
-        function getBooking_timestamp() {
-            const utcDate = new Date();
-            const options = { timeZone: 'America/New_York', hour12: false }; // Eastern Standard Time
-            return utcDate.toLocaleString('en-US', options);
-        }
-
-        // Function to show when event was booked
-        function showWhenEventBooked() {
-            const timestamp = getBooking_timestamp();
-            document.getElementById('booking_time').innerText = `Event booked at: ${timestamp}`;
-        }
-    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Calendar</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.10.2/fullcalendar.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.10.2/fullcalendar.min.css">
 </head>
-<body onload="setupDateSelection();">
-    <h1>Services Cutover Calendar</h1>
-    <form onsubmit="return validateForm();">
+<body>
+    <div id="calendar"></div>
+    <form id="bookingForm">
         <input type="email" id="email" placeholder="Email" required />
-        <input type="text" id="first_name" placeholder="First Name" required />
-        <input type="text" id="last_name" placeholder="Last Name" required />
-        <button type="submit" onclick="showWhenEventBooked();">Book Event</button>
+        <input type="text" id="firstName" placeholder="First Name" required />
+        <input type="text" id="lastName" placeholder="Last Name" required />
+        <button type="submit">Book</button>
     </form>
-    <p id="booking_time"></p>
+    <div id="status"></div>
+    <script>
+        $(document).ready(function() {
+            var selectedDates = [];
+            $('#calendar').fullCalendar({
+                selectable: true,
+                selectHelper: true,
+                select: function(start, end) {
+                    var date = moment(start).format('YYYY-MM-DD');
+                    selectedDates.push(date);
+                    $(this).fullCalendar('renderEvent', {
+                        title: 'Selected',
+                        start: start,
+                        end: end,
+                        rendering: 'background',
+                    });
+                    $('#calendar').fullCalendar('unselect');
+                },
+                eventClick: function(event) {
+                    alert('Event: ' + event.title);
+                }
+            });
+
+            $('#bookingForm').on('submit', function(event) {
+                event.preventDefault();
+                var email = $('#email').val();
+                var firstName = $('#firstName').val();
+                var lastName = $('#lastName').val();
+                var bookingTimestamp = moment().tz('America/New_York').format('YYYY-MM-DD HH:mm:ss');
+
+                $('#status').append(`<p>Event booked by ${firstName} ${lastName} (${email}) on ${bookingTimestamp}</p>`);
+                $('#bookingForm')[0].reset();
+            });
+        });
+    </script>
 </body>
 </html>
