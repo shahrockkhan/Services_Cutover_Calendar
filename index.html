@@ -182,7 +182,6 @@
   <div class="legend">
     <div class="leg-item"><div class="leg-dot multi"></div> Multi-Tenant Build to Prod</div>
     <div class="leg-item"><div class="leg-dot single"></div> Single Tenant OP to Cloud</div>
-    <div class="leg-item"><div class="leg-dot weekend"></div> Weekend (Cloud Activity)</div>
     <span class="hint" id="adminHint"></span>
   </div>
 
@@ -280,6 +279,7 @@
 <script>
   const ADMIN_PIN   = '080808';
   const LEAD_DAYS   = 14;
+  const MAX_DAYS    = 60;
 
   let cur           = new Date();
   let isAdmin       = false;
@@ -315,6 +315,12 @@
     const lc = leadCutoffStr();
     return dateStr >= td && dateStr < lc;
   }
+  function maxCutoffStr() {
+    const t = new Date();
+    t.setDate(t.getDate() + MAX_DAYS);
+    return t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
+  }
+  function isBeyondMax(dateStr) { return dateStr > maxCutoffStr(); }
 
   /* ── Booked dates (from user events only — weekends are virtual) ── */
   function getBookedDates() {
@@ -392,6 +398,7 @@
       const weekend  = !other && isWeekend(dateStr);
       const past     = !isAdmin && !other && isPast(dateStr);
       const leadBlk  = !isAdmin && !other && isInLeadTime(dateStr);
+      const tooFar   = !isAdmin && !other && isBeyondMax(dateStr);
 
       /* day events */
       const dayEvts  = events.filter(e => Array.isArray(e.dates) ? e.dates.includes(dateStr) : e.date === dateStr);
@@ -406,7 +413,7 @@
       });
       if (dayEvts.length > (weekend ? 1 : 2)) evtHtml += `<div class="more">+${dayEvts.length - (weekend ? 1 : 2)} more</div>`;
 
-      const extraClass = isSel ? ' drag-selected' : weekend ? ' weekend' : past ? ' past-blocked' : leadBlk ? ' lead-blocked' : '';
+      const extraClass = isSel ? ' drag-selected' : weekend ? ' weekend' : past ? ' past-blocked' : leadBlk ? ' lead-blocked' : tooFar ? ' past-blocked' : '';
       html += `<div class="day${other ? ' other-month':''}${isToday ? ' today':''}${extraClass}" data-date="${dateStr}" data-other="${other}" data-weekend="${weekend}" data-past="${past}" data-lead="${leadBlk}">${'<span class="dn">'+d+'</span>'}${evtHtml}</div>`;
     }
 
@@ -427,6 +434,7 @@
     if (isWeekend(dateStr))       return 'weekend';
     if (isPast(dateStr))          return 'past';
     if (isInLeadTime(dateStr))    return 'lead';
+    if (isBeyondMax(dateStr))     return 'tooFar';
     if (getBookedDates().has(dateStr)) return 'booked';
     return 'ok';
   }
@@ -491,6 +499,7 @@
     const status  = userCanBook(dateStr);
     if (status === 'weekend') return;               /* silently ignore — already shows Cloud Activity */
     if (status === 'past')    return;               /* silently ignore past */
+    if (status === 'tooFar')  return;               /* silently ignore beyond 60 days */
     if (status === 'lead')    { document.getElementById('alertLeadTime').classList.add('open'); return; }
     if (status === 'booked')  { document.getElementById('alertBooked').classList.add('open'); return; }
     selectedDates = [dateStr];
