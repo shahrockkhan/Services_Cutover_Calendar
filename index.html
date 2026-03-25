@@ -1,13 +1,426 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles.css">
-    <title>Simple Calendar App</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Calendar</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f3;
+      color: #1a1a1a;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container { max-width: 900px; margin: 0 auto; }
+
+    .cal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .cal-title { font-size: 26px; font-weight: 600; color: #111; }
+
+    .cal-nav { display: flex; gap: 8px; align-items: center; }
+
+    .nav-btn, .today-btn {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 7px 14px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #444;
+      transition: background 0.15s;
+    }
+    .nav-btn:hover, .today-btn:hover { background: #f0f0ee; }
+    .today-btn { font-weight: 500; color: #111; }
+
+    .legend {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .leg-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #666; }
+    .leg-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .leg-dot.work     { background: #378ADD; }
+    .leg-dot.personal { background: #1D9E75; }
+    .leg-dot.health   { background: #EF9F27; }
+    .leg-dot.other    { background: #7F77DD; }
+
+    .weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+      margin-bottom: 4px;
+    }
+    .wd {
+      text-align: center;
+      font-size: 12px;
+      color: #999;
+      padding: 4px 0;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+
+    .day {
+      background: #fff;
+      border: 1px solid #e8e8e4;
+      border-radius: 8px;
+      min-height: 96px;
+      padding: 7px;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .day:hover { border-color: #bbb; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .day.other-month { background: #fafaf8; }
+    .day.other-month .dn { color: #ccc; }
+    .day.today { border-color: #378ADD; }
+
+    .dn {
+      font-size: 13px;
+      font-weight: 500;
+      color: #111;
+      display: inline-block;
+      width: 26px;
+      height: 26px;
+      line-height: 26px;
+      text-align: center;
+      border-radius: 50%;
+      margin-bottom: 4px;
+    }
+    .day.today .dn { background: #378ADD; color: #fff; }
+
+    .evt {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .evt.work     { background: #B5D4F4; color: #0C447C; }
+    .evt.personal { background: #9FE1CB; color: #085041; }
+    .evt.health   { background: #FAC775; color: #633806; }
+    .evt.other    { background: #CECBF6; color: #3C3489; }
+
+    .more { font-size: 10px; color: #aaa; margin-top: 2px; }
+
+    /* Modal */
+    .modal-bg {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-bg.open { display: flex; }
+
+    .modal {
+      background: #fff;
+      border-radius: 14px;
+      border: 1px solid #e0e0dc;
+      padding: 1.75rem;
+      width: 360px;
+      max-width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    }
+
+    .modal-title { font-size: 18px; font-weight: 600; margin-bottom: 1.25rem; color: #111; }
+
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 12px; color: #777; margin-bottom: 5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+    .field input, .field textarea, .field select {
+      width: 100%;
+      padding: 9px 11px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+      color: #111;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input:focus, .field textarea:focus { border-color: #378ADD; }
+    .field textarea { resize: vertical; min-height: 76px; }
+
+    .cats { display: flex; gap: 8px; flex-wrap: wrap; }
+    .cat-btn {
+      padding: 5px 13px;
+      border-radius: 20px;
+      border: 1px solid #ddd;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 500;
+      background: #fff;
+      color: #666;
+      transition: all 0.15s;
+    }
+    .cat-btn.work.sel     { background: #B5D4F4; color: #0C447C; border-color: #85B7EB; }
+    .cat-btn.personal.sel { background: #9FE1CB; color: #085041; border-color: #5DCAA5; }
+    .cat-btn.health.sel   { background: #FAC775; color: #633806; border-color: #EF9F27; }
+    .cat-btn.other.sel    { background: #CECBF6; color: #3C3489; border-color: #AFA9EC; }
+
+    .modal-actions { display: flex; gap: 8px; margin-top: 1.25rem; justify-content: flex-end; }
+
+    .btn-cancel {
+      padding: 8px 16px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: none;
+      cursor: pointer;
+      font-size: 14px;
+      color: #666;
+    }
+    .btn-cancel:hover { background: #f5f5f3; }
+
+    .btn-save {
+      padding: 8px 18px;
+      border: 1px solid #85B7EB;
+      border-radius: 8px;
+      background: #E6F1FB;
+      cursor: pointer;
+      font-size: 14px;
+      color: #0C447C;
+      font-weight: 500;
+    }
+    .btn-save:hover { background: #B5D4F4; }
+
+    .btn-del {
+      padding: 8px 16px;
+      border: 1px solid #f09595;
+      border-radius: 8px;
+      background: none;
+      cursor: pointer;
+      font-size: 14px;
+      color: #A32D2D;
+    }
+    .btn-del:hover { background: #FCEBEB; }
+
+    .detail-badge {
+      display: inline-block;
+      padding: 3px 11px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    .detail-badge.work     { background: #B5D4F4; color: #0C447C; }
+    .detail-badge.personal { background: #9FE1CB; color: #085041; }
+    .detail-badge.health   { background: #FAC775; color: #633806; }
+    .detail-badge.other    { background: #CECBF6; color: #3C3489; }
+
+    .detail-date { font-size: 13px; color: #888; margin-bottom: 4px; }
+
+    .detail-note {
+      font-size: 14px;
+      color: #555;
+      margin-top: 12px;
+      line-height: 1.6;
+      border-top: 1px solid #eee;
+      padding-top: 12px;
+    }
+
+    @media (max-width: 600px) {
+      .day { min-height: 64px; padding: 4px; }
+      .dn { font-size: 11px; width: 20px; height: 20px; line-height: 20px; }
+      .evt { font-size: 9px; }
+      .cal-title { font-size: 20px; }
+    }
+  </style>
 </head>
 <body>
-    <div id="calendar"></div>
-    <script src="app.js"></script>
+<div class="container">
+  <div class="cal-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span class="cal-title" id="monthLabel"></span>
+      <button class="today-btn" onclick="goToday()">Today</button>
+    </div>
+    <div class="cal-nav">
+      <button class="nav-btn" onclick="changeMonth(-1)">&#8592;</button>
+      <button class="nav-btn" onclick="changeMonth(1)">&#8594;</button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="leg-item"><div class="leg-dot work"></div> Work</div>
+    <div class="leg-item"><div class="leg-dot personal"></div> Personal</div>
+    <div class="leg-item"><div class="leg-dot health"></div> Health</div>
+    <div class="leg-item"><div class="leg-dot other"></div> Other</div>
+  </div>
+
+  <div class="weekdays">
+    <div class="wd">Sun</div><div class="wd">Mon</div><div class="wd">Tue</div>
+    <div class="wd">Wed</div><div class="wd">Thu</div><div class="wd">Fri</div><div class="wd">Sat</div>
+  </div>
+  <div class="grid" id="calGrid"></div>
+</div>
+
+<!-- Add Event Modal -->
+<div class="modal-bg" id="addModal">
+  <div class="modal">
+    <div class="modal-title" id="addModalTitle">Add event</div>
+    <div class="field"><label>Title</label><input id="evtTitle" placeholder="Event name" /></div>
+    <div class="field"><label>Date</label><input type="date" id="evtDate" /></div>
+    <div class="field"><label>Time (optional)</label><input type="time" id="evtTime" /></div>
+    <div class="field">
+      <label>Category</label>
+      <div class="cats">
+        <button class="cat-btn work" onclick="selCat('work')">Work</button>
+        <button class="cat-btn personal" onclick="selCat('personal')">Personal</button>
+        <button class="cat-btn health" onclick="selCat('health')">Health</button>
+        <button class="cat-btn other" onclick="selCat('other')">Other</button>
+      </div>
+    </div>
+    <div class="field"><label>Notes / Reminder</label><textarea id="evtNote" placeholder="Add a note or reminder..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" onclick="saveEvent()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-bg" id="detailModal">
+  <div class="modal">
+    <div class="modal-title" id="detailTitle"></div>
+    <span class="detail-badge" id="detailBadge"></span>
+    <div class="detail-date" id="detailDate"></div>
+    <div class="detail-note" id="detailNote" style="display:none"></div>
+    <div class="modal-actions">
+      <button class="btn-del" onclick="deleteEvent()">Delete</button>
+      <button class="btn-cancel" onclick="closeDetail()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let cur = new Date();
+  let selCatVal = 'work';
+  let events = JSON.parse(localStorage.getItem('myCalEvents') || '[]');
+  let detailId = null;
+
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  function save() {
+    localStorage.setItem('myCalEvents', JSON.stringify(events));
+  }
+
+  function render() {
+    const y = cur.getFullYear(), m = cur.getMonth();
+    document.getElementById('monthLabel').textContent = months[m] + ' ' + y;
+    const first = new Date(y, m, 1).getDay();
+    const days = new Date(y, m + 1, 0).getDate();
+    const prev = new Date(y, m, 0).getDate();
+    const today = new Date();
+    const cells = (first + days) <= 35 ? 35 : 42;
+    let html = '';
+
+    for (let i = 0; i < cells; i++) {
+      let d, mo = m, yr = y, other = false;
+      if (i < first) {
+        d = prev - (first - 1 - i); mo = m - 1;
+        if (mo < 0) { mo = 11; yr--; } other = true;
+      } else if (i >= first + days) {
+        d = i - first - days + 1; mo = m + 1;
+        if (mo > 11) { mo = 0; yr++; } other = true;
+      } else {
+        d = i - first + 1;
+      }
+      const isToday = !other && d === today.getDate() && m === today.getMonth() && y === today.getFullYear();
+      const dateStr = yr + '-' + String(mo + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      const dayEvts = events.filter(e => e.date === dateStr);
+      let evtHtml = '';
+      dayEvts.slice(0, 2).forEach(e => {
+        evtHtml += `<div class="evt ${e.cat}" onclick="showDetail(event,'${e.id}')">${e.time ? e.time + ' ' : ''}${e.title}</div>`;
+      });
+      if (dayEvts.length > 2) evtHtml += `<div class="more">+${dayEvts.length - 2} more</div>`;
+      html += `<div class="day${other ? ' other-month' : ''}${isToday ? ' today' : ''}" onclick="openAdd('${dateStr}')"><span class="dn">${d}</span>${evtHtml}</div>`;
+    }
+    document.getElementById('calGrid').innerHTML = html;
+  }
+
+  function changeMonth(d) { cur.setMonth(cur.getMonth() + d); render(); }
+  function goToday() { cur = new Date(); render(); }
+
+  function openAdd(dateStr) {
+    document.getElementById('addModalTitle').textContent = 'Add event';
+    document.getElementById('evtTitle').value = '';
+    document.getElementById('evtDate').value = dateStr;
+    document.getElementById('evtTime').value = '';
+    document.getElementById('evtNote').value = '';
+    selCat('work');
+    document.getElementById('addModal').classList.add('open');
+  }
+
+  function closeModal() { document.getElementById('addModal').classList.remove('open'); }
+
+  function selCat(c) {
+    selCatVal = c;
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('sel'));
+    document.querySelector('.cat-btn.' + c).classList.add('sel');
+  }
+
+  function saveEvent() {
+    const t = document.getElementById('evtTitle').value.trim();
+    if (!t) return;
+    events.push({
+      id: Date.now() + '',
+      title: t,
+      date: document.getElementById('evtDate').value,
+      time: document.getElementById('evtTime').value,
+      cat: selCatVal,
+      note: document.getElementById('evtNote').value
+    });
+    save(); closeModal(); render();
+  }
+
+  function showDetail(e, id) {
+    e.stopPropagation();
+    const ev = events.find(x => x.id === id);
+    if (!ev) return;
+    detailId = id;
+    document.getElementById('detailTitle').textContent = ev.title;
+    const b = document.getElementById('detailBadge');
+    b.textContent = ev.cat.charAt(0).toUpperCase() + ev.cat.slice(1);
+    b.className = 'detail-badge ' + ev.cat;
+    document.getElementById('detailDate').textContent = ev.date + (ev.time ? ' · ' + ev.time : '');
+    const n = document.getElementById('detailNote');
+    if (ev.note) { n.textContent = ev.note; n.style.display = 'block'; } else { n.style.display = 'none'; }
+    document.getElementById('detailModal').classList.add('open');
+  }
+
+  function closeDetail() { document.getElementById('detailModal').classList.remove('open'); }
+
+  function deleteEvent() {
+    events = events.filter(e => e.id !== detailId);
+    save(); closeDetail(); render();
+  }
+
+  document.getElementById('addModal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+  document.getElementById('detailModal').addEventListener('click', function(e) { if (e.target === this) closeDetail(); });
+
+  render();
+</script>
 </body>
 </html>
