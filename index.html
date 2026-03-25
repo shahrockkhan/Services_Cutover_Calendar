@@ -1,57 +1,623 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Calendar</title>
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.10.2/fullcalendar.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.10.2/fullcalendar.min.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Calendar</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f3;
+      color: #1a1a1a;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+    .container { max-width: 960px; margin: 0 auto; }
+
+    /* ── Admin bar ── */
+    .admin-bar { display:flex; align-items:center; justify-content:flex-end; margin-bottom:1rem; gap:10px; }
+    .admin-status { font-size:12px; padding:4px 12px; border-radius:20px; font-weight:500; }
+    .admin-status.on  { background:#FAC775; color:#633806; }
+    .admin-status.off { background:#e8e8e4; color:#888; }
+    .admin-toggle-btn { font-size:12px; padding:5px 13px; border-radius:8px; border:1px solid #ddd; background:#fff; cursor:pointer; color:#444; }
+    .admin-toggle-btn:hover { background:#f0f0ee; }
+
+    /* ── PIN modal ── */
+    .pin-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:200; align-items:center; justify-content:center; }
+    .pin-bg.open { display:flex; }
+    .pin-box { background:#fff; border-radius:14px; padding:2rem; width:300px; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,0.12); }
+    .pin-box h2 { font-size:18px; font-weight:600; margin-bottom:6px; }
+    .pin-box p  { font-size:13px; color:#888; margin-bottom:1.25rem; }
+    .pin-box input { width:100%; padding:10px; border:1px solid #ddd; border-radius:8px; font-size:20px; text-align:center; letter-spacing:6px; margin-bottom:10px; outline:none; }
+    .pin-box input:focus { border-color:#378ADD; }
+    .pin-error { font-size:12px; color:#A32D2D; margin-bottom:8px; min-height:16px; }
+    .pin-actions { display:flex; gap:8px; justify-content:center; }
+
+    /* ── Header ── */
+    .cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; flex-wrap:wrap; gap:12px; }
+    .cal-title { font-size:26px; font-weight:600; color:#111; }
+    .cal-nav { display:flex; gap:8px; }
+    .nav-btn, .today-btn { background:#fff; border:1px solid #ddd; border-radius:8px; padding:7px 14px; cursor:pointer; font-size:14px; color:#444; }
+    .nav-btn:hover, .today-btn:hover { background:#f0f0ee; }
+    .today-btn { font-weight:500; color:#111; }
+
+    /* ── Legend ── */
+    .legend { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:1rem; align-items:center; }
+    .leg-item { display:flex; align-items:center; gap:6px; font-size:13px; color:#555; }
+    .leg-dot { width:11px; height:11px; border-radius:50%; }
+    .leg-dot.multi   { background:#E07B00; }
+    .leg-dot.single  { background:#378ADD; }
+    .leg-dot.weekend { background:#d0d0cc; }
+    .hint { font-size:12px; color:#aaa; margin-left:auto; font-style:italic; }
+
+    /* ── Grid ── */
+    .weekdays { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:4px; }
+    .wd { text-align:center; font-size:12px; color:#999; padding:4px 0; font-weight:500; text-transform:uppercase; letter-spacing:.04em; }
+    .grid { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; user-select:none; }
+
+    .day {
+      background:#fff;
+      border:1px solid #e8e8e4;
+      border-radius:8px;
+      min-height:96px;
+      padding:7px;
+      cursor:pointer;
+      transition:border-color .1s, background .1s;
+      position:relative;
+    }
+    .day:hover { border-color:#bbb; }
+    .day.other-month { background:#fafaf8; }
+    .day.other-month .dn { color:#ccc; }
+    .day.today { border-color:#378ADD; }
+    .day.drag-selected { border-color:#E07B00 !important; background:#FFF8F0 !important; box-shadow:0 0 0 2px #FAC77540; }
+
+    /* Weekend & blocked */
+    .day.weekend {
+      background:#f7f7f5;
+      cursor:not-allowed;
+    }
+    .day.weekend .dn { color:#bbb; }
+    .day.past-blocked { cursor:not-allowed; background:#fafaf8; }
+    .day.past-blocked .dn { color:#ccc; }
+    .day.lead-blocked { cursor:not-allowed; }
+
+    .dn { font-size:13px; font-weight:500; color:#111; display:inline-block; width:26px; height:26px; line-height:26px; text-align:center; border-radius:50%; margin-bottom:4px; pointer-events:none; }
+    .day.today .dn { background:#378ADD; color:#fff; }
+
+    .evt { font-size:11px; padding:2px 6px; border-radius:4px; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; font-weight:500; }
+    .evt.multi   { background:#FFE0B2; color:#7A3B00; }
+    .evt.single  { background:#B5D4F4; color:#0C447C; }
+    .evt.weekend { background:#e0e0dc; color:#666; font-style:italic; }
+    .more { font-size:10px; color:#aaa; margin-top:2px; pointer-events:none; }
+
+    /* ── Alert modals ── */
+    .alert-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:300; align-items:center; justify-content:center; }
+    .alert-bg.open { display:flex; }
+    .alert-box { background:#fff; border-radius:14px; padding:2rem; width:320px; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,0.14); }
+    .alert-icon { font-size:32px; margin-bottom:10px; }
+    .alert-box h3 { font-size:17px; font-weight:600; margin-bottom:8px; }
+    .alert-box p  { font-size:14px; color:#666; line-height:1.5; margin-bottom:1.25rem; }
+    .alert-box.danger h3 { color:#A32D2D; }
+    .alert-box.danger { border:2px solid #f09595; }
+
+    /* ── Add/Edit modal ── */
+    .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.35); z-index:100; align-items:center; justify-content:center; padding:1rem; }
+    .modal-bg.open { display:flex; }
+    .modal { background:#fff; border-radius:14px; border:1px solid #e0e0dc; padding:1.75rem; width:400px; max-width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.12); }
+    .modal-title { font-size:18px; font-weight:600; margin-bottom:1.25rem; color:#111; }
+
+    .field { margin-bottom:14px; }
+    .field label { display:block; font-size:12px; color:#777; margin-bottom:5px; font-weight:500; text-transform:uppercase; letter-spacing:.04em; }
+    .field label .req { color:#E24B4A; margin-left:2px; }
+    .field input, .field textarea { width:100%; padding:9px 11px; border:1px solid #ddd; border-radius:8px; font-size:14px; background:#fff; color:#111; font-family:inherit; outline:none; transition:border-color .15s; }
+    .field input:focus, .field textarea:focus { border-color:#378ADD; }
+    .field input.error { border-color:#E24B4A; }
+    .field textarea { resize:vertical; min-height:76px; }
+    .field-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+    .scheduled-window { background:#F0F7FF; border:1px solid #B5D4F4; border-radius:8px; padding:10px 14px; margin-bottom:14px; }
+    .sw-label { font-size:11px; font-weight:600; color:#185FA5; text-transform:uppercase; letter-spacing:.06em; margin-bottom:3px; }
+    .sw-value { font-size:14px; color:#0C447C; font-weight:500; }
+
+    .cats { display:flex; gap:8px; flex-wrap:wrap; }
+    .cat-btn { padding:6px 14px; border-radius:20px; border:1px solid #ddd; font-size:12px; cursor:pointer; font-weight:500; background:#fff; color:#666; transition:all .15s; }
+    .cat-btn.multi.sel  { background:#FFE0B2; color:#7A3B00; border-color:#E07B00; }
+    .cat-btn.single.sel { background:#B5D4F4; color:#0C447C; border-color:#378ADD; }
+
+    .selected-dates-preview { font-size:12px; color:#7A3B00; background:#FFF8F0; border:1px solid #FAC775; border-radius:6px; padding:7px 10px; margin-bottom:14px; display:none; line-height:1.6; }
+
+    .modal-actions { display:flex; gap:8px; margin-top:1.25rem; justify-content:flex-end; }
+    .btn-cancel { padding:8px 16px; border:1px solid #ddd; border-radius:8px; background:none; cursor:pointer; font-size:14px; color:#666; }
+    .btn-cancel:hover { background:#f5f5f3; }
+    .btn-save { padding:8px 18px; border:1px solid #85B7EB; border-radius:8px; background:#E6F1FB; cursor:pointer; font-size:14px; color:#0C447C; font-weight:500; }
+    .btn-save:hover { background:#B5D4F4; }
+    .btn-del { padding:8px 16px; border:1px solid #f09595; border-radius:8px; background:none; cursor:pointer; font-size:14px; color:#A32D2D; }
+    .btn-del:hover { background:#FCEBEB; }
+    .btn-ok { padding:9px 28px; border:1px solid #85B7EB; border-radius:8px; background:#E6F1FB; cursor:pointer; font-size:14px; color:#0C447C; font-weight:500; }
+    .btn-ok:hover { background:#B5D4F4; }
+    .btn-ok.danger { border-color:#f09595; background:#FCEBEB; color:#A32D2D; }
+    .btn-ok.danger:hover { background:#f7c1c1; }
+
+    /* ── Detail modal specifics ── */
+    .detail-badge { display:inline-block; padding:3px 11px; border-radius:20px; font-size:12px; font-weight:500; margin-bottom:8px; }
+    .detail-badge.multi  { background:#FFE0B2; color:#7A3B00; }
+    .detail-badge.single { background:#B5D4F4; color:#0C447C; }
+    .detail-badge.weekend-badge { background:#e0e0dc; color:#555; }
+    .detail-date    { font-size:13px; color:#888; margin-bottom:6px; }
+    .detail-booker  { font-size:14px; color:#444; margin-bottom:4px; font-weight:500; }
+    .detail-sched   { background:#F0F7FF; border:1px solid #B5D4F4; border-radius:8px; padding:8px 12px; margin-top:10px; }
+    .detail-sched .sw-label { font-size:11px; font-weight:600; color:#185FA5; text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px; }
+    .detail-sched .sw-value { font-size:13px; color:#0C447C; font-weight:500; }
+    .detail-note { font-size:14px; color:#555; margin-top:12px; line-height:1.6; border-top:1px solid #eee; padding-top:12px; }
+
+    @media (max-width:600px) {
+      .day { min-height:64px; padding:4px; }
+      .dn  { font-size:11px; width:20px; height:20px; line-height:20px; }
+      .evt { font-size:9px; }
+      .cal-title { font-size:20px; }
+      .hint { display:none; }
+    }
+  </style>
 </head>
 <body>
-    <div id="calendar"></div>
-    <form id="bookingForm">
-        <input type="email" id="email" placeholder="Email" required />
-        <input type="text" id="firstName" placeholder="First Name" required />
-        <input type="text" id="lastName" placeholder="Last Name" required />
-        <button type="submit">Book</button>
-    </form>
-    <div id="status"></div>
-    <script>
-        $(document).ready(function() {
-            var selectedDates = [];
-            $('#calendar').fullCalendar({
-                selectable: true,
-                selectHelper: true,
-                select: function(start, end) {
-                    var date = moment(start).format('YYYY-MM-DD');
-                    selectedDates.push(date);
-                    $(this).fullCalendar('renderEvent', {
-                        title: 'Selected',
-                        start: start,
-                        end: end,
-                        rendering: 'background',
-                    });
-                    $('#calendar').fullCalendar('unselect');
-                },
-                eventClick: function(event) {
-                    alert('Event: ' + event.title);
-                }
-            });
+<div class="container">
 
-            $('#bookingForm').on('submit', function(event) {
-                event.preventDefault();
-                var email = $('#email').val();
-                var firstName = $('#firstName').val();
-                var lastName = $('#lastName').val();
-                var bookingTimestamp = moment().tz('America/New_York').format('YYYY-MM-DD HH:mm:ss');
+  <div class="admin-bar">
+    <span class="admin-status" id="adminStatus">Guest mode</span>
+    <button class="admin-toggle-btn" id="adminToggleBtn" onclick="handleAdminToggle()">Admin login</button>
+  </div>
 
-                $('#status').append(`<p>Event booked by ${firstName} ${lastName} (${email}) on ${bookingTimestamp}</p>`);
-                $('#bookingForm')[0].reset();
-            });
-        });
-    </script>
+  <div class="cal-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span class="cal-title" id="monthLabel"></span>
+      <button class="today-btn" onclick="goToday()">Today</button>
+    </div>
+    <div class="cal-nav">
+      <button class="nav-btn" onclick="changeMonth(-1)">&#8592;</button>
+      <button class="nav-btn" onclick="changeMonth(1)">&#8594;</button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="leg-item"><div class="leg-dot multi"></div> Multi-Tenant Build to Prod</div>
+    <div class="leg-item"><div class="leg-dot single"></div> Single Tenant OP to Cloud</div>
+    <div class="leg-item"><div class="leg-dot weekend"></div> Weekend (Cloud Activity)</div>
+    <span class="hint" id="adminHint"></span>
+  </div>
+
+  <div class="weekdays">
+    <div class="wd">Sun</div><div class="wd">Mon</div><div class="wd">Tue</div>
+    <div class="wd">Wed</div><div class="wd">Thu</div><div class="wd">Fri</div><div class="wd">Sat</div>
+  </div>
+  <div class="grid" id="calGrid"></div>
+</div>
+
+<!-- PIN modal -->
+<div class="pin-bg" id="pinModal">
+  <div class="pin-box">
+    <h2>Admin Access</h2>
+    <p>Enter your 6-digit PIN</p>
+    <input type="password" id="pinInput" maxlength="6" placeholder="••••••" oninput="clearPinError()" onkeydown="if(event.key==='Enter')confirmPin()" />
+    <div class="pin-error" id="pinError"></div>
+    <div class="pin-actions">
+      <button class="btn-cancel" onclick="closePinModal()">Cancel</button>
+      <button class="btn-save"   onclick="confirmPin()">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- Already booked alert -->
+<div class="alert-bg" id="alertBooked">
+  <div class="alert-box">
+    <div class="alert-icon">📅</div>
+    <h3>Date Already Booked</h3>
+    <p>Sorry, this date is already booked. Please select a different date.</p>
+    <button class="btn-ok" onclick="closeAlertBooked()">OK</button>
+  </div>
+</div>
+
+<!-- Lead time alert (red) -->
+<div class="alert-bg" id="alertLeadTime">
+  <div class="alert-box danger">
+    <div class="alert-icon">⏰</div>
+    <h3>Lead Time Required</h3>
+    <p>Booking a slot requires <strong>2 week lead time</strong>. Please select a date at least 14 days from today.</p>
+    <button class="btn-ok danger" onclick="closeAlertLeadTime()">OK</button>
+  </div>
+</div>
+
+<!-- Add / Edit Modal -->
+<div class="modal-bg" id="addModal">
+  <div class="modal">
+    <div class="modal-title" id="addModalTitle">Add event</div>
+    <div class="selected-dates-preview" id="selectedDatesPreview"></div>
+    <div class="field-row">
+      <div class="field"><label>First name <span class="req">*</span></label><input id="evtFirst" placeholder="First name" /></div>
+      <div class="field"><label>Last name <span class="req">*</span></label><input id="evtLast" placeholder="Last name" /></div>
+    </div>
+    <div class="field"><label>Event title <span class="req">*</span></label><input id="evtTitle" placeholder="Event name" /></div>
+    <div class="field" id="dateFieldWrap"><label>Date</label><input type="date" id="evtDate" /></div>
+    <div class="scheduled-window">
+      <div class="sw-label">Scheduled Window</div>
+      <div class="sw-value">00:00 AM to 6:00 AM &mdash; Customer's Local Time Zone</div>
+    </div>
+    <div class="field">
+      <label>Category <span class="req">*</span></label>
+      <div class="cats">
+        <button class="cat-btn multi"  onclick="selCat('multi')">Multi-Tenant Build to Prod</button>
+        <button class="cat-btn single" onclick="selCat('single')">Single Tenant OP to Cloud</button>
+      </div>
+    </div>
+    <div class="field"><label>Notes / Reminder</label><textarea id="evtNote" placeholder="Add a note or reminder..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save"   onclick="saveEvent()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-bg" id="detailModal">
+  <div class="modal">
+    <div class="modal-title" id="detailTitle"></div>
+    <span class="detail-badge" id="detailBadge"></span>
+    <div class="detail-booker" id="detailBooker"></div>
+    <div class="detail-date"   id="detailDate"></div>
+    <div class="detail-sched">
+      <div class="sw-label">Scheduled Window</div>
+      <div class="sw-value">00:00 AM to 6:00 AM &mdash; Customer's Local Time Zone</div>
+    </div>
+    <div class="detail-note" id="detailNote" style="display:none"></div>
+    <div class="modal-actions">
+      <button class="btn-del"    id="detailDelBtn"  onclick="deleteEvent()" style="display:none">Delete</button>
+      <button class="btn-save"   id="detailEditBtn" onclick="editEvent()"   style="display:none;margin-right:auto">Edit</button>
+      <button class="btn-cancel" onclick="closeDetail()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const ADMIN_PIN   = '080808';
+  const LEAD_DAYS   = 14;
+
+  let cur           = new Date();
+  let isAdmin       = false;
+  let selCatVal     = 'multi';
+  let selectedDates = [];
+  let editingId     = null;
+  let detailId      = null;
+  let events        = JSON.parse(localStorage.getItem('calEventsV4') || '[]');
+
+  /* drag state */
+  let isDragging = false;
+  let dragMoved  = false;
+
+  function save() { localStorage.setItem('calEventsV4', JSON.stringify(events)); }
+
+  /* ── Date helpers ── */
+  function todayStr() {
+    const t = new Date();
+    return t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
+  }
+  function leadCutoffStr() {
+    const t = new Date();
+    t.setDate(t.getDate() + LEAD_DAYS);
+    return t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
+  }
+  function isWeekend(dateStr) {
+    const d = new Date(dateStr + 'T12:00:00');
+    return d.getDay() === 0 || d.getDay() === 6;
+  }
+  function isPast(dateStr)     { return dateStr < todayStr(); }
+  function isInLeadTime(dateStr) {
+    const td = todayStr();
+    const lc = leadCutoffStr();
+    return dateStr >= td && dateStr < lc;
+  }
+
+  /* ── Booked dates (from user events only — weekends are virtual) ── */
+  function getBookedDates() {
+    const booked = new Set();
+    events.forEach(e => {
+      if (Array.isArray(e.dates)) e.dates.forEach(d => booked.add(d));
+      else if (e.date) booked.add(e.date);
+    });
+    return booked;
+  }
+
+  /* ── Admin ── */
+  function handleAdminToggle() {
+    if (isAdmin) { isAdmin = false; selectedDates = []; updateAdminUI(); render(); }
+    else {
+      document.getElementById('pinInput').value = '';
+      document.getElementById('pinError').textContent = '';
+      document.getElementById('pinModal').classList.add('open');
+      setTimeout(() => document.getElementById('pinInput').focus(), 100);
+    }
+  }
+  function closePinModal() { document.getElementById('pinModal').classList.remove('open'); }
+  function clearPinError() { document.getElementById('pinError').textContent = ''; }
+  function confirmPin() {
+    if (document.getElementById('pinInput').value.trim() === ADMIN_PIN) {
+      isAdmin = true; closePinModal(); updateAdminUI(); render();
+    } else {
+      document.getElementById('pinError').textContent = 'Incorrect PIN. Try again.';
+    }
+  }
+  function updateAdminUI() {
+    const st = document.getElementById('adminStatus'), btn = document.getElementById('adminToggleBtn'), hint = document.getElementById('adminHint');
+    if (isAdmin) {
+      st.textContent = 'Admin mode'; st.className = 'admin-status on';
+      btn.textContent = 'Logout';
+      hint.textContent = 'Click & drag to select multiple dates';
+    } else {
+      st.textContent = 'Guest mode'; st.className = 'admin-status off';
+      btn.textContent = 'Admin login';
+      hint.textContent = '';
+    }
+  }
+
+  /* ── Alerts ── */
+  function closeAlertBooked()   { document.getElementById('alertBooked').classList.remove('open'); }
+  function closeAlertLeadTime() { document.getElementById('alertLeadTime').classList.remove('open'); }
+
+  /* ── Render ── */
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  function render() {
+    const y = cur.getFullYear(), m = cur.getMonth();
+    document.getElementById('monthLabel').textContent = MONTHS[m] + ' ' + y;
+    const first = new Date(y, m, 1).getDay();
+    const days  = new Date(y, m+1, 0).getDate();
+    const prev  = new Date(y, m, 0).getDate();
+    const today = new Date();
+    const cells = (first + days) <= 35 ? 35 : 42;
+    const booked = getBookedDates();
+    let html = '';
+
+    for (let i = 0; i < cells; i++) {
+      let d, mo = m, yr = y, other = false;
+      if (i < first) {
+        d = prev - (first-1-i); mo = m-1;
+        if (mo < 0)  { mo = 11; yr--; } other = true;
+      } else if (i >= first+days) {
+        d = i-first-days+1; mo = m+1;
+        if (mo > 11) { mo = 0; yr++; } other = true;
+      } else { d = i-first+1; }
+
+      const isToday  = !other && d === today.getDate() && m === today.getMonth() && y === today.getFullYear();
+      const dateStr  = yr + '-' + String(mo+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      const isSel    = selectedDates.includes(dateStr);
+      const weekend  = !other && isWeekend(dateStr);
+      const past     = !isAdmin && !other && isPast(dateStr);
+      const leadBlk  = !isAdmin && !other && isInLeadTime(dateStr);
+
+      /* day events */
+      const dayEvts  = events.filter(e => Array.isArray(e.dates) ? e.dates.includes(dateStr) : e.date === dateStr);
+
+      let evtHtml = '';
+      /* virtual weekend label */
+      if (weekend && !other) {
+        evtHtml += `<div class="evt weekend">Cloud Activity</div>`;
+      }
+      dayEvts.slice(0, weekend ? 1 : 2).forEach(e => {
+        evtHtml += `<div class="evt ${e.cat}" data-id="${e.id}">${e.title}</div>`;
+      });
+      if (dayEvts.length > (weekend ? 1 : 2)) evtHtml += `<div class="more">+${dayEvts.length - (weekend ? 1 : 2)} more</div>`;
+
+      const extraClass = isSel ? ' drag-selected' : weekend ? ' weekend' : past ? ' past-blocked' : leadBlk ? ' lead-blocked' : '';
+      html += `<div class="day${other ? ' other-month':''}${isToday ? ' today':''}${extraClass}" data-date="${dateStr}" data-other="${other}" data-weekend="${weekend}" data-past="${past}" data-lead="${leadBlk}">${'<span class="dn">'+d+'</span>'}${evtHtml}</div>`;
+    }
+
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = html;
+    grid.querySelectorAll('.evt[data-id]').forEach(el => {
+      el.addEventListener('mousedown', e => e.stopPropagation());
+      el.addEventListener('click',     e => { e.stopPropagation(); showDetail(el.dataset.id); });
+    });
+  }
+
+  function changeMonth(d) { selectedDates = []; cur.setMonth(cur.getMonth()+d); render(); }
+  function goToday()       { selectedDates = []; cur = new Date(); render(); }
+
+  /* ── Validate a date for non-admin clicks ── */
+  function userCanBook(dateStr) {
+    if (isAdmin) return 'ok';
+    if (isWeekend(dateStr))       return 'weekend';
+    if (isPast(dateStr))          return 'past';
+    if (isInLeadTime(dateStr))    return 'lead';
+    if (getBookedDates().has(dateStr)) return 'booked';
+    return 'ok';
+  }
+
+  /* ── Drag-to-select (admin only) ── */
+  const calGrid = document.getElementById('calGrid');
+
+  calGrid.addEventListener('mousedown', e => {
+    if (!isAdmin) return;
+    const day = e.target.closest('.day');
+    if (!day || day.dataset.other === 'true') return;
+    isDragging    = true;
+    dragMoved     = false;
+    selectedDates = [day.dataset.date];
+    render();
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!isDragging || !isAdmin) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el) return;
+    const day = el.closest ? el.closest('.day') : null;
+    if (!day || day.dataset.other === 'true') return;
+    const d = day.dataset.date;
+    if (!selectedDates.includes(d)) { selectedDates.push(d); dragMoved = true; render(); }
+  });
+
+  document.addEventListener('mouseup', e => {
+    if (!isDragging) return;
+    isDragging = false;
+    if (selectedDates.length === 0) return;
+
+    /* single click (no drag) */
+    if (!dragMoved && selectedDates.length === 1) {
+      const dateStr = selectedDates[0];
+      if (getBookedDates().has(dateStr)) {
+        selectedDates = []; render();
+        document.getElementById('alertBooked').classList.add('open');
+        return;
+      }
+      openAdd(dateStr); return;
+    }
+
+    /* drag — check conflicts */
+    const booked = getBookedDates();
+    if (selectedDates.some(d => booked.has(d))) {
+      selectedDates = []; render();
+      document.getElementById('alertBooked').classList.add('open');
+      return;
+    }
+    openAdd(null);
+  });
+
+  /* ── Guest single-click ── */
+  calGrid.addEventListener('click', e => {
+    if (isAdmin) return;                            /* admin handled via mousedown/up */
+    if (e.target.closest('.evt[data-id]')) return;  /* clicking event pill → detail */
+    const day = e.target.closest('.day');
+    if (!day || day.dataset.other === 'true') return;
+    const dateStr = day.dataset.date;
+    const status  = userCanBook(dateStr);
+    if (status === 'weekend') return;               /* silently ignore — already shows Cloud Activity */
+    if (status === 'past')    return;               /* silently ignore past */
+    if (status === 'lead')    { document.getElementById('alertLeadTime').classList.add('open'); return; }
+    if (status === 'booked')  { document.getElementById('alertBooked').classList.add('open'); return; }
+    selectedDates = [dateStr];
+    openAdd(dateStr);
+  });
+
+  /* ── Add modal ── */
+  function openAdd(dateStr) {
+    editingId = null;
+    document.getElementById('addModalTitle').textContent = 'Add event';
+    document.getElementById('evtFirst').value = '';
+    document.getElementById('evtLast').value  = '';
+    document.getElementById('evtTitle').value = '';
+    document.getElementById('evtNote').value  = '';
+    ['evtFirst','evtLast','evtTitle'].forEach(id => document.getElementById(id).classList.remove('error'));
+
+    const isMulti  = selectedDates.length > 1;
+    const preview  = document.getElementById('selectedDatesPreview');
+    const dateWrap = document.getElementById('dateFieldWrap');
+    if (isMulti) {
+      const sorted = [...selectedDates].sort();
+      preview.innerHTML = '<strong>' + sorted.length + ' dates selected:</strong> ' + sorted.join(', ');
+      preview.style.display = 'block';
+      dateWrap.style.display = 'none';
+    } else {
+      preview.style.display  = 'none';
+      dateWrap.style.display = 'block';
+      document.getElementById('evtDate').value = dateStr || '';
+    }
+    selCat('multi');
+    document.getElementById('addModal').classList.add('open');
+  }
+
+  function closeModal() { document.getElementById('addModal').classList.remove('open'); selectedDates = []; render(); }
+
+  function selCat(c) {
+    selCatVal = c;
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('sel'));
+    document.querySelector('.cat-btn.' + c).classList.add('sel');
+  }
+
+  function saveEvent() {
+    const first = document.getElementById('evtFirst').value.trim();
+    const last  = document.getElementById('evtLast').value.trim();
+    const title = document.getElementById('evtTitle').value.trim();
+    let valid   = true;
+    [['evtFirst',first],['evtLast',last],['evtTitle',title]].forEach(([id,val]) => {
+      const el = document.getElementById(id);
+      if (!val) { el.classList.add('error'); valid = false; } else el.classList.remove('error');
+    });
+    if (!valid) return;
+
+    const isMulti    = selectedDates.length > 1;
+    const dates      = isMulti ? [...selectedDates].sort() : null;
+    const singleDate = isMulti ? null : document.getElementById('evtDate').value;
+    const toCheck    = dates || (singleDate ? [singleDate] : []);
+
+    /* conflict check */
+    const conflicts = toCheck.filter(d => events.some(ev => ev.id !== editingId && (Array.isArray(ev.dates) ? ev.dates.includes(d) : ev.date === d)));
+    if (conflicts.length > 0) { closeModal(); document.getElementById('alertBooked').classList.add('open'); return; }
+
+    const ev = { id: editingId || (Date.now()+''), first, last, title, date: singleDate, dates, cat: selCatVal, note: document.getElementById('evtNote').value };
+    if (editingId) events = events.map(e => e.id === editingId ? ev : e);
+    else           events.push(ev);
+    save(); closeModal(); render();
+  }
+
+  /* ── Detail modal ── */
+  function showDetail(id) {
+    const ev = events.find(x => x.id === id);
+    if (!ev) return;
+    detailId = id;
+    document.getElementById('detailTitle').textContent  = ev.title;
+    const b = document.getElementById('detailBadge');
+    b.textContent = ev.cat === 'multi' ? 'Multi-Tenant Build to Prod' : 'Single Tenant OP to Cloud';
+    b.className   = 'detail-badge ' + ev.cat;
+    document.getElementById('detailBooker').textContent = 'Booked by: ' + ev.first + ' ' + ev.last;
+    const dateDisplay = ev.dates ? ev.dates.join(', ') : (ev.date || '');
+    document.getElementById('detailDate').textContent   = dateDisplay;
+    const n = document.getElementById('detailNote');
+    if (ev.note) { n.textContent = ev.note; n.style.display = 'block'; } else n.style.display = 'none';
+    document.getElementById('detailDelBtn').style.display  = isAdmin ? '' : 'none';
+    document.getElementById('detailEditBtn').style.display = isAdmin ? '' : 'none';
+    document.getElementById('detailModal').classList.add('open');
+  }
+
+  function closeDetail() { document.getElementById('detailModal').classList.remove('open'); }
+
+  function deleteEvent() {
+    if (!isAdmin) return;
+    events = events.filter(e => e.id !== detailId);
+    save(); closeDetail(); render();
+  }
+
+  function editEvent() {
+    if (!isAdmin) return;
+    const ev = events.find(x => x.id === detailId);
+    if (!ev) return;
+    closeDetail();
+    editingId = ev.id;
+    document.getElementById('addModalTitle').textContent = 'Edit event';
+    document.getElementById('evtFirst').value = ev.first || '';
+    document.getElementById('evtLast').value  = ev.last  || '';
+    document.getElementById('evtTitle').value = ev.title;
+    document.getElementById('evtNote').value  = ev.note  || '';
+    const isMulti  = ev.dates && ev.dates.length > 1;
+    const preview  = document.getElementById('selectedDatesPreview');
+    const dateWrap = document.getElementById('dateFieldWrap');
+    if (isMulti) {
+      selectedDates = [...ev.dates];
+      preview.innerHTML = '<strong>' + ev.dates.length + ' dates:</strong> ' + ev.dates.join(', ');
+      preview.style.display = 'block'; dateWrap.style.display = 'none';
+    } else {
+      preview.style.display = 'none'; dateWrap.style.display = 'block';
+      document.getElementById('evtDate').value = ev.date || '';
+    }
+    selCat(ev.cat || 'multi');
+    document.getElementById('addModal').classList.add('open');
+  }
+
+  /* ── Backdrop close ── */
+  [['addModal', closeModal], ['detailModal', closeDetail], ['pinModal', closePinModal],
+   ['alertBooked', closeAlertBooked], ['alertLeadTime', closeAlertLeadTime]].forEach(([id, fn]) => {
+    document.getElementById(id).addEventListener('click', e => { if (e.target === document.getElementById(id)) fn(); });
+  });
+
+  render();
+</script>
 </body>
 </html>
