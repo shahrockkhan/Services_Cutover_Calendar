@@ -399,7 +399,7 @@
       const past=!isAdmin&&!other&&isPast(s),lead=!isAdmin&&!other&&isLead(s),far=!isAdmin&&!other&&isFar(s);
       const de=evts.filter(e=>Array.isArray(e.dates)?e.dates.includes(s):e.date===s);
       let body='';
-      if(wknd&&!other)body+=`<div class="evt weekend"><span class="evt-name">Cloud Activity</span></div>`;
+      if(wknd&&!other)body+=`<div class="evt weekend"><span class="evt-name">Contact Cloud PM</span></div>`;
       de.slice(0,wknd?0:1).forEach(e=>{body+=`<div class="evt ${e.cat}" data-id="${e.id}"><span class="evt-name">${e.title}</span><span class="evt-who">${e.customer||e.email||''}</span></div>`;});
       if(de.length>(wknd?0:1))body+=`<div class="more">+${de.length-(wknd?0:1)} more</div>`;
       const cls=['day',other?'other-month':'',isToday?'today':'',sel?'drag-selected':'',wknd&&!sel?'weekend':'',(past||far)&&!sel?'past-blocked':'',lead&&!sel?'lead-blocked':''].filter(Boolean).join(' ');
