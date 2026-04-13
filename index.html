@@ -24,6 +24,10 @@
       --blue-bg:    #eff6ff;
       --blue-bdr:   #bfdbfe;
       --blue-txt:   #1d4ed8;
+      --green:      #10b981;
+      --green-bg:   #ecfdf5;
+      --green-bdr:  #6ee7b7;
+      --green-txt:  #065f46;  
       --red:        #ef4444;
       --red-bg:     #fef2f2;
       --red-bdr:    #fecaca;
@@ -82,6 +86,7 @@
     .leg-dot { width:11px; height:11px; border-radius:3px; }
     .leg-dot.multi  { background:var(--orange); }
     .leg-dot.single { background:var(--accent); }
+    .leg-dot.upgrade { background:var(--green); }
     .hint { font-size:11px; color:var(--text3); margin-left:auto; font-style:italic; }
 
     /* ── Calendar grid ── */
@@ -138,6 +143,7 @@
     .evt:hover { filter:brightness(.96); }
     .evt.multi  { background:linear-gradient(135deg,#ff9a4d,#f97316); color:#fff; }
     .evt.single { background:linear-gradient(135deg,#7b6ef6,#4ec9f5); color:#fff; }
+    .evt.upgrade { background:linear-gradient(135deg,#34d399,#10b981); color:#fff; }
     .evt.weekend { background:#edeef5; color:var(--text3); font-style:italic; }
     .evt-name { font-weight:700; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .evt-who  { font-size:10px; opacity:.82; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
@@ -168,6 +174,7 @@
     .cat-btn { padding:6px 14px; border-radius:20px; border:1px solid var(--border); font-size:12px; font-weight:600; cursor:pointer; background:#f5f6fb; color:var(--text2); transition:all .15s; }
     .cat-btn.multi.sel  { background:var(--orange-bg); color:var(--orange-txt); border-color:var(--orange-bdr); }
     .cat-btn.single.sel { background:var(--blue-bg); color:var(--blue-txt); border-color:var(--blue-bdr); }
+    .cat-btn.upgrade.sel { background:var(--green-bg); color:var(--green-txt); border-color:var(--green-bdr); }
 
     .dates-prev { font-size:12px; color:var(--orange-txt); background:var(--orange-bg); border:1px solid var(--orange-bdr); border-radius:var(--radius); padding:8px 12px; margin-bottom:14px; display:none; line-height:1.6; }
 
@@ -203,6 +210,7 @@
     .det-badge { display:inline-block; padding:3px 11px; border-radius:20px; font-size:11px; font-weight:700; margin-bottom:10px; text-transform:uppercase; letter-spacing:.05em; }
     .det-badge.multi  { background:var(--orange-bg); color:var(--orange-txt); border:1px solid var(--orange-bdr); }
     .det-badge.single { background:var(--blue-bg); color:var(--blue-txt); border:1px solid var(--blue-bdr); }
+    .det-badge.upgrade { background:var(--green-bg); color:var(--green-txt); border:1px solid var(--green-bdr); }  
     .det-booker { font-size:14px; color:var(--text); font-weight:600; margin-bottom:4px; }
     .det-date   { font-size:13px; color:var(--text2); margin-bottom:12px; }
     .det-note   { font-size:13px; color:var(--text2); margin-top:12px; line-height:1.6; border-top:1px solid var(--border); padding-top:12px; }
@@ -252,6 +260,7 @@
   <div class="legend">
     <div class="leg-item"><div class="leg-dot multi"></div> Multi-Tenant Build to Prod</div>
     <div class="leg-item"><div class="leg-dot single"></div> Single Tenant OP to Cloud</div>
+    <div class="leg-item"><div class="leg-dot upgrade"></div> Cloud Upgrades</div>
     <span class="hint" id="adminHint"></span>
   </div>
   <div class="weekdays">
@@ -302,7 +311,7 @@
     <div class="field"><label>Your Email Address <span class="req">*</span></label><input id="evtEmail" type="email" placeholder="xyz@nice.com"/></div>
     <div class="field"><label>Customer Name <span class="req">*</span></label><input id="evtCustomer" placeholder="e.g. Citigroup"/></div>
     <div class="field"><label>Event title <span class="req">*</span></label><input id="evtTitle" placeholder="Customer Name: Build to Prod Cutover"/></div>
-    <div class="field"><label>Cloud Project SR#</label><input id="evtSR" placeholder="e.g. SR123456"/></div>
+    <div class="field"><label>Cloud Project SR# <span class="req">*</span></label><input id="evtSR" placeholder="e.g. SR-123456"/></div>
     <div class="field" id="dateWrap"><label>Date</label><input type="date" id="evtDate"/></div>
     <div class="sched-box"><div class="sched-lbl">Scheduled Window</div><div class="sched-val">00:00 AM to 6:00 AM &mdash; Customer's Local Time Zone</div></div>
     <div class="field">
@@ -310,6 +319,7 @@
       <div class="cats">
         <button class="cat-btn multi"  onclick="selCat('multi')">Multi-Tenant Build to Prod</button>
         <button class="cat-btn single" onclick="selCat('single')">Single Tenant OP to Cloud</button>
+        <button class="cat-btn upgrade" onclick="selCat('upgrade')">Cloud Upgrades</button>
       </div>
     </div>
     <div class="field"><label>Notes</label><textarea id="evtNote" placeholder="Wiser Instance ID..."></textarea></div>
@@ -476,7 +486,7 @@
   function showDetail(id){
     const ev=evts.find(x=>x.id===id);if(!ev)return;detId=id;
     $('detTitle').textContent=ev.title;
-    const b=$('detBadge');b.textContent=ev.cat==='multi'?'Multi-Tenant Build to Prod':'Single Tenant OP to Cloud';b.className='det-badge '+ev.cat;
+    const b=$('detBadge');b.textContent=ev.cat==='multi'?'Multi-Tenant Build to Prod':ev.cat==='upgrade'?'Cloud Upgrades':'Single Tenant OP to Cloud';b.className='det-badge '+ev.cat;
     $('detBooker').textContent=(ev.customer||'')+(ev.email?' · '+ev.email:'')+(ev.sr?' · SR# '+ev.sr:'');
     $('detDate').textContent=ev.dates?ev.dates.join(', '):(ev.date||'');
     const n=$('detNote');if(ev.note){n.textContent=ev.note;n.style.display='block';}else n.style.display='none';
